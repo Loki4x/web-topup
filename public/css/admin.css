@@ -1,0 +1,29 @@
+body.admin { flex-direction: row; min-height: 100vh; }
+.side { width: 230px; flex-shrink: 0; background: var(--bg2); border-right: 1px solid var(--line); padding: 20px 14px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 20px; }
+.side nav { display: grid; gap: 4px; }
+.side nav a { padding: 10px 12px; border-radius: 10px; color: var(--muted); font-weight: 600; font-size: .92rem; }
+.side nav a.active, .side nav a:hover { background: var(--card); color: var(--text); }
+.side .back { margin-top: auto; font-size: .85rem; }
+.admin-main { flex: 1; padding: 28px; min-width: 0; }
+.admin-main h1 { font-size: 1.5rem; margin-bottom: 16px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+.stat small { color: var(--muted); display: block; }
+.stat b { font-size: 1.4rem; display: block; margin-top: 4px; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.toolbar input, .toolbar select { width: auto; min-width: 200px; }
+.admin table td, .admin table th { padding: 10px 12px; font-size: .85rem; vertical-align: top; }
+.admin table input, .admin table select { padding: 6px 8px; font-size: .85rem; min-width: 90px; }
+.grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: end; margin-bottom: 18px; }
+td.actions { white-space: nowrap; }
+td.actions .btn { margin: 2px; }
+.btn-xs { padding: 5px 10px; font-size: .78rem; border-radius: 8px; }
+.btn-danger { background: rgba(239,68,68,.15); color: #f87171; border: 1px solid rgba(239,68,68,.3); }
+.pill { font-size: .72rem; padding: 2px 8px; border-radius: 99px; background: var(--line); white-space: nowrap; }
+.denied { max-width: 420px; margin: 80px auto; text-align: center; }
+@media (max-width: 860px) {
+  body.admin { flex-direction: column; }
+  .side { width: 100%; height: auto; position: static; }
+  .side nav { grid-auto-flow: column; overflow-x: auto; }
+  .admin-main { padding: 16px; }
+}
