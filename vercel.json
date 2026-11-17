@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "",
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "rewrites": [{ "source": "/api/(.*)", "destination": "/api" }],
+  "functions": {
+    "api/index.js": { "maxDuration": 60, "includeFiles": "supabase/schema.sql" }
+  },
+  "crons": [{ "path": "/api/callback/cron", "schedule": "0 19 * * *" }],
+  "regions": ["sin1"]
+}
