@@ -29,16 +29,14 @@ const mock = {
   },
   // customer_no berakhiran 0000 => simulasi gagal; selain itu sukses setelah beberapa detik
   async transaction({ sku, customerNo, refId }) {
-    mock._pending.set(refId, Date.now());
     return { ref_id: refId, customer_no: customerNo, buyer_sku_code: sku, status: "Pending", message: "Transaksi Pending", sn: "", rc: "03" };
   },
-  async status({ sku, customerNo, refId }) {
-    const started = mock._pending.get(refId) || 0;
-    if (Date.now() - started < 3000) return { ref_id: refId, status: "Pending", message: "Transaksi Pending", sn: "" };
+  // `since` = waktu pesanan dibayar (disimpan di database, aman untuk serverless)
+  async status({ sku, customerNo, refId, since }) {
+    if (Date.now() - new Date(since || 0) < 3000) return { ref_id: refId, status: "Pending", message: "Transaksi Pending", sn: "" };
     if (customerNo.endsWith("0000")) return { ref_id: refId, status: "Gagal", message: "Nomor tujuan salah (simulasi)", sn: "", rc: "49" };
     return { ref_id: refId, customer_no: customerNo, buyer_sku_code: sku, status: "Sukses", message: "Transaksi Sukses", sn: "SIM" + crypto.randomBytes(6).toString("hex").toUpperCase(), rc: "00" };
   },
-  _pending: new Map(),
 };
 
 // ---- Real ----

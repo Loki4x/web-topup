@@ -13,8 +13,6 @@ const newId = prefix => {
   return `${prefix}${ymd}${crypto.randomBytes(5).toString("hex").toUpperCase()}`;
 };
 
-const nowSql = (offsetMs = 0) => new Date(Date.now() + offsetMs).toISOString().replace("T", " ").slice(0, 19);
-
 const normalizePhone = p => {
   let s = String(p || "").replace(/\D/g, "");
   if (s.startsWith("62")) s = "0" + s.slice(2);
@@ -52,4 +50,4 @@ setInterval(() => {
 
 const asyncH = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-module.exports = { HttpError, newId, nowSql, normalizePhone, isValidPhone, isValidEmail, maskPhone, maskName, rateLimit, asyncH };
+module.exports = { HttpError, newId, normalizePhone, isValidPhone, isValidEmail, maskPhone, maskName, rateLimit, asyncH };

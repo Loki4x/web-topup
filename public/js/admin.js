@@ -4,9 +4,9 @@
   const view = $("#view");
   const rupiah = n => "Rp" + Math.round(n || 0).toLocaleString("id-ID");
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const fmt = s => (s ? new Date(String(s).replace(" ", "T") + "Z").toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" }) : "-");
-  // datetime-local (waktu lokal) -> "YYYY-MM-DD HH:MM:SS" UTC untuk server
-  const toUtc = v => (v ? new Date(v).toISOString().replace("T", " ").slice(0, 19) : null);
+  const fmt = s => (s ? new Date(s).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" }) : "-");
+  // datetime-local (waktu lokal browser) -> ISO 8601 UTC untuk server
+  const toUtc = v => (v ? new Date(v).toISOString() : null);
   const STATUS = { WAITING: "Menunggu", PROCESSING: "Diproses", SUCCESS: "Sukses", FAILED: "Gagal", REFUNDED: "Refund", EXPIRED: "Kedaluwarsa" };
   const cls = s => ({ SUCCESS: "ok", PROCESSING: "info", REFUNDED: "info", FAILED: "bad", EXPIRED: "bad" }[s] || "wait");
 

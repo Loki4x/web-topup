@@ -1,6 +1,5 @@
 // Katalog: tampilan per brand Digiflazz + perhitungan harga jual.
-const { db, getSettings } = require("./db");
-const { nowSql } = require("./util");
+const { db } = require("./db");
 
 const key = s => String(s).toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -71,10 +70,10 @@ const PALETTE = [["#6c5cff", "#00d4ff"], ["#ff6a3d", "#ffb800"], ["#00b894", "#0
 const slugify = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** Daftar game/brand yang punya produk aktif, digabung dengan konfigurasi tampilan. */
-function listGames() {
-  const brands = db.prepare(`
+async function listGames() {
+  const brands = await db.all(`
     SELECT brand, MIN(category) AS category, COUNT(*) AS n FROM products
-    WHERE enabled = 1 AND available = 1 GROUP BY brand`).all();
+    WHERE enabled AND available GROUP BY brand`);
   const byKey = new Map(GAMES.map(g => [key(g.brand), g]));
   return brands.map((b, i) => {
     const cfg = byKey.get(key(b.brand));
@@ -86,7 +85,7 @@ function listGames() {
   }).sort((a, b) => (b.popular ? 1 : 0) - (a.popular ? 1 : 0) || (byKey.has(key(b.brand)) ? 1 : 0) - (byKey.has(key(a.brand)) ? 1 : 0) || a.name.localeCompare(b.name));
 }
 
-const findGame = slug => listGames().find(g => g.slug === slug) || null;
+const findGame = async slug => (await listGames()).find(g => g.slug === slug) || null;
 
 // Bentuk aman untuk dikirim ke browser (tanpa fungsi).
 const publicGame = g => ({
@@ -102,7 +101,7 @@ function roleMargin(role, s) {
 }
 
 /** Harga jual untuk role tertentu ('guest' | 'member' | 'reseller' | 'admin'). */
-function sellPrice(product, role = "guest", s = getSettings()) {
+function sellPrice(product, role, s) {
   if (product.custom_price && role === "guest") return product.custom_price;
   const round = Math.max(1, Number(s.round_to) || 1);
   const p = Math.ceil((product.base_price * (1 + roleMargin(role, s) / 100)) / round) * round;
@@ -110,18 +109,21 @@ function sellPrice(product, role = "guest", s = getSettings()) {
 }
 
 function activeFlashSales() {
-  const now = nowSql();
-  return db.prepare(`
+  return db.all(`
     SELECT f.*, p.name AS product_name, p.brand FROM flash_sales f JOIN products p ON p.sku = f.sku
-    WHERE f.start_at <= ? AND f.end_at > ? AND (f.stock IS NULL OR f.sold < f.stock) AND p.enabled = 1 AND p.available = 1
-    ORDER BY f.end_at`).all(now, now);
+    WHERE f.start_at <= now() AND f.end_at > now() AND (f.stock IS NULL OR f.sold < f.stock) AND p.enabled AND p.available
+    ORDER BY f.end_at`);
 }
 
 /** Produk untuk satu brand, lengkap dengan harga sesuai role & flash sale. */
-function productsFor(brand, role) {
-  const s = getSettings();
-  const flash = new Map(activeFlashSales().map(f => [f.sku, f]));
-  return db.prepare("SELECT * FROM products WHERE brand = ? AND enabled = 1 AND available = 1 ORDER BY base_price").all(brand).map(p => {
+async function productsFor(brand, role) {
+  const [s, flashes, rows] = await Promise.all([
+    db.getSettings(),
+    activeFlashSales(),
+    db.all("SELECT * FROM products WHERE brand = ? AND enabled AND available ORDER BY base_price", brand),
+  ]);
+  const flash = new Map(flashes.map(f => [f.sku, f]));
+  return rows.map(p => {
     const normal = sellPrice(p, role, s);
     const f = flash.get(p.sku);
     const price = f ? Math.min(f.price, normal) : normal;
@@ -133,31 +135,26 @@ function productsFor(brand, role) {
   });
 }
 
-/** Simpan hasil price list Digiflazz ke tabel products. */
-function syncProducts(list) {
-  const upsert = db.prepare(`
-    INSERT INTO products (sku, brand, category, type, name, base_price, available, synced_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    ON CONFLICT(sku) DO UPDATE SET brand = excluded.brand, category = excluded.category, type = excluded.type,
-      name = excluded.name, base_price = excluded.base_price, available = excluded.available, synced_at = excluded.synced_at`);
-  const seen = new Set();
-  db.exec("BEGIN");
-  try {
-    for (const p of list) {
-      const available = p.buyer_product_status && p.seller_product_status && (p.unlimited_stock || p.stock > 0) ? 1 : 0;
-      upsert.run(p.buyer_sku_code, p.brand, p.category, p.type || null, p.product_name, Number(p.price), available);
-      seen.add(p.buyer_sku_code);
-    }
+/** Simpan hasil price list Digiflazz ke tabel products (satu query massal, cepat untuk serverless). */
+async function syncProducts(list) {
+  const uniq = new Map(list.map(p => [p.buyer_sku_code, p]));
+  const rows = [...uniq.values()];
+  const col = f => rows.map(f);
+  await db.tx(async t => {
+    await t.query(`
+      INSERT INTO products (sku, brand, category, type, name, base_price, available, synced_at)
+      SELECT u.sku, u.brand, u.category, u.type, u.name, u.base_price, u.available, now()
+      FROM unnest(?::text[], ?::text[], ?::text[], ?::text[], ?::text[], ?::bigint[], ?::boolean[]) AS u(sku, brand, category, type, name, base_price, available)
+      ON CONFLICT (sku) DO UPDATE SET brand = excluded.brand, category = excluded.category, type = excluded.type,
+        name = excluded.name, base_price = excluded.base_price, available = excluded.available, synced_at = excluded.synced_at`,
+      [
+        col(p => p.buyer_sku_code), col(p => p.brand), col(p => p.category), col(p => p.type || null), col(p => p.product_name),
+        col(p => Number(p.price)), col(p => !!(p.buyer_product_status && p.seller_product_status && (p.unlimited_stock || p.stock > 0))),
+      ]);
     // Produk yang hilang dari price list ditandai tidak tersedia.
-    for (const { sku } of db.prepare("SELECT sku FROM products").all()) {
-      if (!seen.has(sku)) db.prepare("UPDATE products SET available = 0 WHERE sku = ?").run(sku);
-    }
-    db.exec("COMMIT");
-  } catch (e) {
-    db.exec("ROLLBACK");
-    throw e;
-  }
-  return seen.size;
+    await t.query("UPDATE products SET available = false WHERE NOT (sku = ANY(?::text[]))", [col(p => p.buyer_sku_code)]);
+  });
+  return rows.length;
 }
 
 module.exports = { listGames, findGame, publicGame, productsFor, sellPrice, activeFlashSales, syncProducts, TABS };

@@ -51,10 +51,14 @@ function clearSession(res) {
 }
 
 // Middleware: isi req.user jika login.
-function loadUser(req, _res, next) {
-  const id = readToken(parseCookies(req.headers.cookie)[COOKIE]);
-  req.user = id ? db.prepare("SELECT id, name, email, whatsapp, role, balance, created_at FROM users WHERE id = ?").get(id) || null : null;
-  next();
+async function loadUser(req, _res, next) {
+  try {
+    const id = readToken(parseCookies(req.headers.cookie)[COOKIE]);
+    req.user = id ? await db.one("SELECT id, name, email, whatsapp, role, balance, created_at FROM users WHERE id = ?", id) : null;
+    next();
+  } catch (e) {
+    next(e);
+  }
 }
 const requireUser = (req, _res, next) => (req.user ? next() : next(new HttpError(401, "Silakan login terlebih dahulu.")));
 const requireAdmin = (req, _res, next) => (req.user?.role === "admin" ? next() : next(new HttpError(403, "Khusus admin.")));

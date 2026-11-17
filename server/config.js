@@ -9,12 +9,18 @@ const env = (k, d = "") => (process.env[k] ?? d).trim();
 
 const config = {
   port: Number(env("PORT", "3000")),
-  baseUrl: env("BASE_URL", "http://localhost:3000").replace(/\/$/, ""),
+  // Di Vercel, BASE_URL otomatis memakai domain produksi bila tidak diisi.
+  baseUrl: (env("BASE_URL") || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")).replace(/\/$/, ""),
   storeName: env("STORE_NAME", "RhineShop"),
   storeEmail: env("STORE_EMAIL", "cs@rhineshop.id"),
-  dbFile: env("DB_FILE", path.join(__dirname, "..", "data", "rhineshop.db")),
-  sessionSecret: env("SESSION_SECRET") || crypto.randomBytes(32).toString("hex"),
-  isProduction: env("NODE_ENV") === "production",
+  // Connection string Supabase (Transaction pooler, port 6543) atau Postgres lain
+  databaseUrl: env("DATABASE_URL"),
+  isServerless: !!process.env.VERCEL,
+  // Dipakai Vercel Cron (header Authorization: Bearer <CRON_SECRET>)
+  cronSecret: env("CRON_SECRET"),
+  // Jika kosong, diturunkan dari DATABASE_URL agar tetap sama di semua instance serverless.
+  sessionSecret: env("SESSION_SECRET") || crypto.createHash("sha256").update("rs-session:" + env("DATABASE_URL")).digest("hex"),
+  isProduction: env("NODE_ENV") === "production" || !!process.env.VERCEL,
 
   digiflazz: {
     username: env("DIGIFLAZZ_USERNAME"),
@@ -43,7 +49,7 @@ config.mockTripay = !config.tripay.apiKey || !config.tripay.privateKey || !confi
 config.mockNickname = !config.nickname.url;
 
 if (!env("SESSION_SECRET")) {
-  console.warn("[config] SESSION_SECRET belum diisi — sesi login akan hilang setiap server restart.");
+  console.warn("[config] SESSION_SECRET belum diisi — sementara memakai turunan DATABASE_URL. Isi dengan string acak panjang.");
 }
 
 module.exports = config;

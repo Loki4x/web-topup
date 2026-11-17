@@ -7,7 +7,7 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const initials = name => name.split(/[\s:]+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const cover = (g, cls = "") => `<div class="cover ${cls}" style="--c1:${g.colors[0]};--c2:${g.colors[1]}"><span>${esc(initials(g.name))}</span></div>`;
-  const utc = s => new Date(String(s).replace(" ", "T") + "Z"); // tanggal dari server (UTC)
+  const utc = s => new Date(s); // tanggal dari server (ISO 8601)
   const fmtDate = s => (s ? utc(s).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "-");
   const ago = s => {
     const m = Math.max(0, Math.round((Date.now() - utc(s)) / 60000));
